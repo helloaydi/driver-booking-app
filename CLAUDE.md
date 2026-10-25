@@ -15,7 +15,10 @@ One Node app serves the API and a React PWA with three areas: customer (`/`), dr
 - Booking status: requested → accepted → arrived → started → completed (or cancelled). A driver dropping a trip puts it back to requested.
 - The 4-digit OTP is shown only in the customer app (accepted/arrived) and the driver enters it to start. Never send it to the driver API.
 - Pickup must be within 35 km of central Bangalore. Drivers see requests within `match_radius_km` that match their transmission.
-- No cash. Online payment (Razorpay) is not built yet.
+- No cash. The customer pays online right after the trip (Razorpay Checkout) and can't book again until paid.
+  `server/payments.js`: order via Razorpay Orders API (plain fetch, no SDK), confirmed by the checkout signature
+  (`/api/payments/verify`) and/or the signed webhook (`/api/payments/webhook`, public, checks amount). Both are idempotent.
+- Driver payouts are manual: admin pays by bank/UPI, then marks it on /admin/payouts (only customer-paid trips count).
 
 ## Commands
 - `npm run dev` (API on :4602, reads `.env`) + `npm run dev:web` (Vite on :5173, proxies /api)
@@ -33,7 +36,7 @@ Shared course server (about 15 students). Full guide: `DEPLOY-GUIDE.md`.
 | Code | `~/apps/driverbooking` (clone of https://github.com/helloaydi/driver-booking-app, public) |
 | Database | `~/data/driverbooking/driverbooking.db` |
 | Backups | `~/data/driverbooking/backups/`, nightly at 21:48 UTC via crontab, kept 14 days |
-| Settings | `~/.config/driverbooking.env` (chmod 600): PORT, HOST, NODE_ENV, DB_PATH, ADMIN_EMAILS, GOOGLE_CLIENT_ID |
+| Settings | `~/.config/driverbooking.env` (chmod 600): PORT, HOST, NODE_ENV, DB_PATH, ADMIN_EMAILS, GOOGLE_CLIENT_ID, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET |
 | Service | `~/.config/systemd/user/driverbooking.service`, runs `node server/index.js` |
 
 Update after pushing to GitHub:

@@ -107,6 +107,33 @@ export function adminRouter({ db }) {
     res.json({ ok: true });
   });
 
+  // What we owe each driver: trips the customer has paid for, not yet paid out.
+  router.get('/api/admin/payouts', (req, res) => {
+    res.json(
+      db
+        .prepare(
+          `SELECT u.id AS driver_id, u.name, u.phone, COUNT(*) AS trips, SUM(b.driver_earning) AS owed,
+             MIN(b.completed_at) AS oldest
+           FROM bookings b JOIN users u ON u.id = b.driver_id
+           WHERE b.status = 'completed' AND b.payment_status = 'paid' AND b.payout_status = 'unpaid'
+           GROUP BY u.id ORDER BY owed DESC`,
+        )
+        .all(),
+    );
+  });
+
+  // Record that the driver was paid (by bank transfer or UPI, outside the app).
+  router.post('/api/admin/payouts/:driverId/paid', (req, res) => {
+    const { changes } = db
+      .prepare(
+        `UPDATE bookings SET payout_status = 'paid', payout_at = ?
+         WHERE driver_id = ? AND status = 'completed' AND payment_status = 'paid' AND payout_status = 'unpaid'`,
+      )
+      .run(now(), Number(req.params.driverId));
+    if (!changes) throw new HttpError(404, 'Nothing owed to this driver');
+    res.json({ trips: changes });
+  });
+
   router.get('/api/admin/settings', (req, res) => res.json(getSettings(db)));
 
   router.put('/api/admin/settings', (req, res) => {

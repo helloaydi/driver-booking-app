@@ -7,6 +7,7 @@ import { authRouter, requireUser } from './auth.js';
 import { customerRouter } from './customer.js';
 import { driverRouter } from './driver.js';
 import { adminRouter } from './admin.js';
+import { paymentsRouter } from './payments.js';
 import { CITY } from './pricing.js';
 import { expireRequests } from './bookings.js';
 
@@ -21,6 +22,11 @@ export function loadConfig(env = process.env) {
     googleClientId: env.GOOGLE_CLIENT_ID || '',
     adminEmails: (env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     devLogin: env.DEV_LOGIN === '1',
+    razorpay: {
+      keyId: env.RAZORPAY_KEY_ID || '',
+      keySecret: env.RAZORPAY_KEY_SECRET || '',
+      webhookSecret: env.RAZORPAY_WEBHOOK_SECRET || '',
+    },
   };
 }
 
@@ -29,7 +35,8 @@ export function createApp(config, db = openDb(config.dbPath)) {
   // HTTPS ends at the course proxy, which forwards plain HTTP to us.
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '20kb' }));
+  // Keep the raw body too: Razorpay webhook signatures are over the exact bytes.
+  app.use(express.json({ limit: '100kb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 
   // Writes must be JSON. Browsers can't send that cross-site without CORS,
   // which (with SameSite cookies) blocks cross-site form posts.
@@ -42,10 +49,16 @@ export function createApp(config, db = openDb(config.dbPath)) {
 
   app.get('/api/health', (req, res) => res.json({ ok: true }));
   app.get('/api/config', (req, res) =>
-    res.json({ googleClientId: config.googleClientId, devLogin: config.devLogin && !config.production, city: CITY }),
+    res.json({
+      googleClientId: config.googleClientId,
+      devLogin: config.devLogin && !config.production,
+      payments: Boolean(config.razorpay?.keyId && config.razorpay?.keySecret),
+      city: CITY,
+    }),
   );
 
   app.use(authRouter({ db, config }));
+  app.use(paymentsRouter({ db, config }));
   app.use('/api', requireUser);
   app.use(driverRouter({ db }));
   app.use(adminRouter({ db }));

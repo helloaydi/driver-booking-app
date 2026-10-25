@@ -13,8 +13,8 @@ export default function Customer() {
 
   return (
     <div className="stack">
-      {unpaid && <PaymentDue booking={unpaid} />}
-      {active ? <ActiveBooking booking={active} onChange={bookings.reload} /> : <BookForm onBooked={bookings.reload} />}
+      {unpaid && <PaymentDue booking={unpaid} onPaid={bookings.reload} />}
+      {active ? <ActiveBooking booking={active} onChange={bookings.reload} /> : !unpaid && <BookForm onBooked={bookings.reload} />}
     </div>
   );
 }
@@ -185,14 +185,63 @@ function Elapsed({ since }) {
   return <p>Started {timeLabel(since)} · {minutesLabel(Math.floor((Date.now() - Date.parse(since)) / 60000))} so far</p>;
 }
 
-function PaymentDue({ booking: b }) {
+function loadCheckout() {
+  if (window.Razorpay) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Could not load the payment page. Check your connection.'));
+    document.head.appendChild(script);
+  });
+}
+
+function PaymentDue({ booking: b, onPaid }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function pay() {
+    setBusy(true);
+    setError('');
+    try {
+      await loadCheckout();
+      const order = await api('/api/payments/order', { method: 'POST', body: { booking_id: b.id } });
+      new window.Razorpay({
+        key: order.key_id,
+        order_id: order.order_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'DriverBooking',
+        description: `Trip #${b.id} · ${minutesLabel(b.billed_minutes)}`,
+        prefill: order.prefill,
+        theme: { color: '#0f766e' },
+        handler: async (response) => {
+          try {
+            await api('/api/payments/verify', { method: 'POST', body: response });
+            onPaid();
+          } catch (e) {
+            setError(e.message);
+          }
+        },
+        modal: { ondismiss: () => setBusy(false) },
+      })
+        .on('payment.failed', (r) => setError(r.error?.description || 'Payment failed. Please try again.'))
+        .open();
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="card notice stack">
       <div className="row between">
         <strong>Trip completed</strong>
         <strong className="big">{rupees(b.amount)}</strong>
       </div>
-      <small>{minutesLabel(b.billed_minutes)} billed · {b.car.model}. Online payment is coming soon.</small>
+      <small>{minutesLabel(b.billed_minutes)} billed · {b.car.model}. Please pay to book your next trip.</small>
+      {error && <p className="error">{error}</p>}
+      <button className="primary" onClick={pay} disabled={busy}>{busy ? 'Opening payment…' : `Pay ${rupees(b.amount)}`}</button>
     </div>
   );
 }

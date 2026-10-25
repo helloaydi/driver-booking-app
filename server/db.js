@@ -88,6 +88,23 @@ const MIGRATIONS = [
     value  TEXT NOT NULL
   );
   `,
+  `
+  -- One row per Razorpay order. status: created | paid
+  CREATE TABLE payments (
+    id          INTEGER PRIMARY KEY,
+    booking_id  INTEGER NOT NULL REFERENCES bookings(id),
+    order_id    TEXT NOT NULL UNIQUE,
+    payment_id  TEXT,
+    amount      INTEGER NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'created',
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    paid_at     TEXT
+  );
+  CREATE INDEX payments_booking ON payments(booking_id);
+
+  ALTER TABLE bookings ADD COLUMN paid_at TEXT;
+  ALTER TABLE bookings ADD COLUMN payout_at TEXT;
+  `,
 ];
 
 export const DEFAULT_SETTINGS = {

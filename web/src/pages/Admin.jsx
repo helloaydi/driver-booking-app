@@ -9,12 +9,14 @@ export default function Admin() {
         <NavLink to="/admin" end>Overview</NavLink>
         <NavLink to="/admin/bookings">Bookings</NavLink>
         <NavLink to="/admin/drivers">Drivers</NavLink>
+        <NavLink to="/admin/payouts">Payouts</NavLink>
         <NavLink to="/admin/settings">Pricing</NavLink>
       </nav>
       <Routes>
         <Route index element={<Overview />} />
         <Route path="bookings" element={<Bookings />} />
         <Route path="drivers" element={<Drivers />} />
+        <Route path="payouts" element={<Payouts />} />
         <Route path="settings" element={<Settings />} />
       </Routes>
     </div>
@@ -104,7 +106,9 @@ function BookingTable({ status }) {
                     ) : '—'}
                 </td>
                 <td>
-                  {b.status === 'completed' ? <>{rupees(b.amount)}<div className="muted">cut {rupees(b.commission)}</div></> : <span className="muted">~{rupees(b.estimate)}</span>}
+                  {b.status === 'completed'
+                    ? <>{rupees(b.amount)}<div className="muted">cut {rupees(b.commission)} · {b.payment_status === 'paid' ? 'paid' : 'unpaid'}</div></>
+                    : <span className="muted">~{rupees(b.estimate)}</span>}
                 </td>
                 <td>
                   {['requested', 'accepted', 'arrived', 'started'].includes(b.status) && (
@@ -169,6 +173,48 @@ function Drivers() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function Payouts() {
+  const payouts = usePoll('/api/admin/payouts');
+  const [msg, setMsg] = useState(null);
+
+  async function markPaid(p) {
+    if (!confirm(`Have you sent ${rupees(p.owed)} to ${p.name}? This marks their ${p.trips} trip(s) as paid out.`)) return;
+    try {
+      await api(`/api/admin/payouts/${p.driver_id}/paid`, { method: 'POST', body: {} });
+      setMsg({ ok: true, text: `Recorded payout to ${p.name}.` });
+      payouts.reload();
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    }
+  }
+
+  if (!payouts.data) return null;
+  return (
+    <div className="stack">
+      <p className="muted">Driver earnings from trips the customer has paid for. Send the money by bank transfer or UPI, then mark it here.</p>
+      {msg && <p className={msg.ok ? 'success' : 'error'}>{msg.text}</p>}
+      {payouts.data.length === 0 ? <p className="muted">Nothing owed right now.</p> : (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Driver</th><th>Trips</th><th>Owed</th><th>Oldest trip</th><th></th></tr></thead>
+            <tbody>
+              {payouts.data.map((p) => (
+                <tr key={p.driver_id}>
+                  <td>{p.name}<div className="muted">{p.phone}</div></td>
+                  <td>{p.trips}</td>
+                  <td><strong>{rupees(p.owed)}</strong></td>
+                  <td>{timeLabel(p.oldest)}</td>
+                  <td><button className="link" onClick={() => markPaid(p)}>Mark paid</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

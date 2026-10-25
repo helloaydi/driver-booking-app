@@ -16,7 +16,9 @@ export default function Trips() {
           <div className="row between">
             <span>{b.car.model}{b.driver && ` · ${b.driver.name}`}</span>
             <span>
-              {b.status === 'completed' ? `${minutesLabel(b.billed_minutes)} · ${rupees(b.amount)}` : hoursLabel(b.booked_hours)}
+              {b.status === 'completed'
+                ? `${minutesLabel(b.billed_minutes)} · ${rupees(b.amount)} · ${b.payment_status === 'paid' ? 'Paid' : 'Payment due'}`
+                : hoursLabel(b.booked_hours)}
             </span>
           </div>
           {b.cancel_reason && <small className="muted">{b.cancel_reason}</small>}

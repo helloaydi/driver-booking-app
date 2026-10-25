@@ -100,6 +100,10 @@ export function customerRouter({ db }) {
     const id = db.transaction(() => {
       expireRequests(db);
       if (activeBookingFor(db, 'customer_id', req.user.id)) throw new HttpError(409, 'You already have an active booking');
+      const unpaid = db
+        .prepare(`SELECT id FROM bookings WHERE customer_id = ? AND status = 'completed' AND payment_status != 'paid'`)
+        .get(req.user.id);
+      if (unpaid) throw new HttpError(409, 'Please pay for your last trip first');
       const s = getSettings(db);
       const { lastInsertRowid } = db
         .prepare(
