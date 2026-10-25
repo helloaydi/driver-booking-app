@@ -20,3 +20,33 @@ One Node app serves the API and a React PWA with three areas: customer (`/`), dr
 ## Commands
 - `npm run dev` (API on :4602, reads `.env`) + `npm run dev:web` (Vite on :5173, proxies /api)
 - `npm test`, `npm run build`, `npm start`
+
+## Deployment
+Shared course server (about 15 students). Full guide: `DEPLOY-GUIDE.md`.
+
+| | |
+|---|---|
+| Server | `ssh siyasparayil@187.127.162.81` (key login) |
+| App name | `driverbooking` |
+| Port | 4602 on 127.0.0.1 |
+| Address | https://driverbooking-siyasparayil.dhilber.in (HTTPS ends at the instructor's proxy) |
+| Code | `~/apps/driverbooking` (clone of https://github.com/helloaydi/driver-booking-app, public) |
+| Database | `~/data/driverbooking/driverbooking.db` |
+| Backups | `~/data/driverbooking/backups/`, nightly at 21:48 UTC via crontab, kept 14 days |
+| Settings | `~/.config/driverbooking.env` (chmod 600): PORT, HOST, NODE_ENV, DB_PATH, ADMIN_EMAILS, GOOGLE_CLIENT_ID |
+| Service | `~/.config/systemd/user/driverbooking.service`, runs `node server/index.js` |
+
+Update after pushing to GitHub:
+```
+ssh siyasparayil@187.127.162.81 "cd ~/apps/driverbooking && git pull && npm ci && npm run build && systemctl --user restart driverbooking"
+```
+Then check `systemctl --user status driverbooking --no-pager`, `curl -s http://127.0.0.1:4602/api/health`, and the address.
+Logs: `journalctl --user -u driverbooking -n 50 --no-pager`. After editing the env file, restart the service.
+
+Server rules:
+1. No sudo, apt or `npm install -g`. If something needs root, the student asks the instructor.
+2. Stay inside /home/siyasparayil. Never touch anything you didn't create; other students' apps run here.
+3. Listen on 127.0.0.1 only, on a port in 4600–4699 (4600 tuition, 4601 quickbill, 4602 driverbooking), including test runs.
+4. Don't touch the web server, firewall or DNS.
+5. Secrets only in `~/.config/driverbooking.env`, never in git or this file.
+6. Keep it running with `systemctl --user`, not pm2, nohup, screen or `&`.
