@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { STATUS_LABEL, api, getLocation, hoursLabel, minutesLabel, rupees, timeLabel, usePoll } from '../api.js';
+import { STATUS_LABEL, api, hoursLabel, minutesLabel, rupees, timeLabel, usePoll } from '../api.js';
 import { Cars } from './Profile.jsx';
 
 const ACTIVE = ['requested', 'accepted', 'arrived', 'started'];
@@ -24,8 +24,6 @@ function BookForm({ onBooked }) {
   const [carId, setCarId] = useState(null);
   const [hours, setHours] = useState(null);
   const [address, setAddress] = useState('');
-  const [location, setLocation] = useState(null);
-  const [locating, setLocating] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const quote = usePoll(`/api/estimate${hours ? `?hours=${hours}` : ''}`);
@@ -37,24 +35,12 @@ function BookForm({ onBooked }) {
     if (carId === null && cars.data?.length) setCarId(cars.data[0].id);
   }, [cars.data, carId]);
 
-  async function locate() {
-    setLocating(true);
-    setError('');
-    try {
-      setLocation(await getLocation());
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLocating(false);
-    }
-  }
-
   async function book(e) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      await api('/api/bookings', { method: 'POST', body: { car_id: carId, hours, pickup_address: address, ...location } });
+      await api('/api/bookings', { method: 'POST', body: { car_id: carId, hours, pickup_address: address } });
       onBooked();
     } catch (err) {
       setError(err.message);
@@ -99,9 +85,6 @@ function BookForm({ onBooked }) {
       <label>Pickup address
         <textarea rows="2" placeholder="House no., street, area, landmark" value={address} onChange={(e) => setAddress(e.target.value)} required />
       </label>
-      <button type="button" className={location ? 'secondary done' : 'secondary'} onClick={locate} disabled={locating}>
-        {locating ? 'Getting location…' : location ? '✓ Location shared' : 'Share my current location'}
-      </button>
 
       {q && (
         <div className="card quote">
@@ -114,8 +97,7 @@ function BookForm({ onBooked }) {
       )}
 
       {error && <p className="error">{error}</p>}
-      <button className="primary" disabled={busy || !location || !carId}>{busy ? 'Booking…' : 'Book driver now'}</button>
-      {!location && <small className="muted center">Share your location so we can find drivers near you.</small>}
+      <button className="primary" disabled={busy || !carId}>{busy ? 'Booking…' : 'Book driver now'}</button>
     </form>
   );
 }
@@ -138,7 +120,7 @@ function ActiveBooking({ booking: b, onChange }) {
       <div className={`status status-${b.status}`}>
         {b.status === 'requested' && <span className="pulse" />}
         <h2>{STATUS_LABEL[b.status]}</h2>
-        {b.status === 'requested' && <p>We're matching you with a driver nearby. This usually takes a few minutes.</p>}
+        {b.status === 'requested' && <p>We're matching you with a driver. This usually takes a few minutes.</p>}
         {b.status === 'started' && <Elapsed since={b.started_at} />}
       </div>
 

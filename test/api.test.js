@@ -4,10 +4,6 @@ import { createApp } from '../server/index.js';
 import { openDb } from '../server/db.js';
 import { finalFare } from '../server/pricing.js';
 
-const MG_ROAD = { lat: 12.9756, lng: 77.6066 };
-const INDIRANAGAR = { lat: 12.9784, lng: 77.6408 };
-const MYSORE = { lat: 12.2958, lng: 76.6394 };
-
 let server, base, db;
 
 before(async () => {
@@ -73,19 +69,15 @@ test('full booking flow: request, accept, OTP start, complete', async () => {
   const car = await customer.post('/api/cars', { model: 'Swift', reg_no: 'KA 01 AB 1234', transmission: 'manual' });
   assert.equal(car.status, 200);
 
-  // Outside Bangalore is refused.
-  const far = await customer.post('/api/bookings', { car_id: car.data.id, hours: 3, pickup_address: 'Mysore Palace', ...MYSORE });
-  assert.equal(far.status, 400);
-
   const booking = await customer.post('/api/bookings', {
-    car_id: car.data.id, hours: 3, pickup_address: '12 MG Road, Bangalore', ...MG_ROAD,
+    car_id: car.data.id, hours: 3, pickup_address: '12 MG Road, Bangalore',
   });
   assert.equal(booking.status, 200);
   const id = booking.data.id;
   assert.equal((await customer.get(`/api/bookings/${id}`)).data.estimate, 60000);
   assert.equal((await customer.get(`/api/bookings/${id}`)).data.otp, null, 'no OTP before a driver accepts');
   assert.equal(
-    (await customer.post('/api/bookings', { car_id: car.data.id, hours: 2, pickup_address: 'Somewhere else', ...MG_ROAD })).status,
+    (await customer.post('/api/bookings', { car_id: car.data.id, hours: 2, pickup_address: 'Somewhere else' })).status,
     409,
     'one active booking at a time',
   );
@@ -94,13 +86,13 @@ test('full booking flow: request, accept, OTP start, complete', async () => {
   for (const [d, phone, transmission] of [[driver, '9900011111', 'both'], [other, '9900022222', 'automatic']]) {
     await d.put('/api/me', { name: 'Driver', phone });
     assert.equal((await d.post('/api/driver/apply', { licence_no: 'KA01 20150012345', experience_years: 5, transmission })).status, 200);
-    assert.equal((await d.post('/api/driver/online', { online: true, ...INDIRANAGAR })).status, 403);
+    assert.equal((await d.post('/api/driver/online', { online: true })).status, 403);
   }
   const drivers = (await admin.get('/api/admin/drivers')).data;
   for (const d of drivers) assert.equal((await admin.post(`/api/admin/drivers/${d.user_id}/review`, { status: 'approved' })).status, 200);
 
-  assert.equal((await driver.post('/api/driver/online', { online: true, ...INDIRANAGAR })).status, 200);
-  assert.equal((await other.post('/api/driver/online', { online: true, ...INDIRANAGAR })).status, 200);
+  assert.equal((await driver.post('/api/driver/online', { online: true })).status, 200);
+  assert.equal((await other.post('/api/driver/online', { online: true })).status, 200);
 
   const requests = (await driver.get('/api/driver/requests')).data;
   assert.equal(requests.length, 1);
@@ -143,7 +135,7 @@ test('driver dropping a trip puts it back up; admin can assign and cancel', asyn
   const driver = await login('ravi@test.in');
   await customer.put('/api/me', { name: 'Meena', phone: '9845099999' });
   const car = await customer.post('/api/cars', { model: 'Creta', reg_no: 'KA05MN4321', transmission: 'automatic' });
-  const { data } = await customer.post('/api/bookings', { car_id: car.data.id, hours: 2, pickup_address: 'Koramangala 5th Block', ...MG_ROAD });
+  const { data } = await customer.post('/api/bookings', { car_id: car.data.id, hours: 2, pickup_address: 'Koramangala 5th Block' });
 
   const ravi = (await admin.get('/api/admin/drivers')).data.find((d) => d.email === 'ravi@test.in');
   assert.equal((await admin.post(`/api/admin/bookings/${data.id}/assign`, { driver_id: ravi.user_id })).status, 200);

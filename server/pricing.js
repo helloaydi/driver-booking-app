@@ -1,18 +1,4 @@
-// Bangalore service area: a circle around the city centre.
-export const CITY = { name: 'Bangalore', lat: 12.9716, lng: 77.5946, radius_km: 35 };
-
-export function distanceKm(lat1, lng1, lat2, lng2) {
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.sqrt(a));
-}
-
-export function inServiceArea(lat, lng) {
-  return distanceKm(lat, lng, CITY.lat, CITY.lng) <= CITY.radius_km;
-}
+export const CITY = { name: 'Bangalore' };
 
 // Upfront estimate shown before booking: the hours the customer asked for,
 // never less than the minimum.

@@ -225,7 +225,6 @@ const FIELDS = [
   ['min_hours', 'Minimum hours', 1],
   ['billing_step_min', 'Round trip time up to (minutes)', 1],
   ['commission_pct', 'Our commission (%)', 1],
-  ['match_radius_km', 'Show requests to drivers within (km)', 1],
   ['request_timeout_min', 'Cancel unaccepted requests after (minutes)', 1],
 ];
 

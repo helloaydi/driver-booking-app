@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
-import { STATUS_LABEL, api, getLocation, hoursLabel, minutesLabel, rupees, timeLabel, usePoll } from '../api.js';
+import { STATUS_LABEL, api, hoursLabel, minutesLabel, rupees, timeLabel, usePoll } from '../api.js';
 import { useMe } from '../me.js';
 
 export default function Driver() {
@@ -76,14 +76,12 @@ function DriverHome({ profile, onChange }) {
   const [fare, setFare] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  useLocationReporting(online);
 
   async function toggle() {
     setBusy(true);
     setError('');
     try {
-      const body = online ? { online: false } : { online: true, ...(await getLocation()) };
-      await api('/api/driver/online', { method: 'POST', body });
+      await api('/api/driver/online', { method: 'POST', body: { online: !online } });
       onChange();
     } catch (e) {
       setError(e.message);
@@ -111,7 +109,7 @@ function DriverHome({ profile, onChange }) {
       <div className={`card row between ${online ? 'online' : ''}`}>
         <div>
           <strong>{online ? 'You are online' : 'You are offline'}</strong>
-          <div className="muted small">{online ? 'New trips near you appear below.' : 'Go online to get trips.'}</div>
+          <div className="muted small">{online ? 'New trip requests appear below.' : 'Go online to get trips.'}</div>
         </div>
         <button className={online ? 'secondary' : 'primary'} onClick={toggle} disabled={busy}>
           {busy ? '…' : online ? 'Go offline' : 'Go online'}
@@ -120,12 +118,12 @@ function DriverHome({ profile, onChange }) {
       {error && <p className="error">{error}</p>}
       {online && Array.isArray(requests.data) && (
         requests.data.length === 0 ? (
-          <p className="muted center">No requests nearby right now. Keep this screen open.</p>
+          <p className="muted center">No requests right now. Keep this screen open.</p>
         ) : (
           requests.data.map((r) => (
             <div key={r.id} className="card stack">
               <div className="row between">
-                <strong>{r.distance_km} km away</strong>
+                <strong>{hoursLabel(r.booked_hours)}</strong>
                 <strong className="big">{rupees(r.est_earning)}</strong>
               </div>
               <div>{r.pickup_address}</div>
@@ -139,25 +137,8 @@ function DriverHome({ profile, onChange }) {
   );
 }
 
-// While online, send the driver's position every 30 seconds at most.
-function useLocationReporting(online) {
-  const last = useRef(0);
-  useEffect(() => {
-    if (!online || !navigator.geolocation) return;
-    const id = navigator.geolocation.watchPosition(
-      (p) => {
-        if (Date.now() - last.current < 30000) return;
-        last.current = Date.now();
-        api('/api/driver/location', { method: 'POST', body: { lat: p.coords.latitude, lng: p.coords.longitude } }).catch(() => {});
-      },
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 30000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
-  }, [online]);
-}
-
 function ActiveTrip({ trip: t, onChange, onCompleted }) {
+  const { me } = useMe();
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -177,7 +158,7 @@ function ActiveTrip({ trip: t, onChange, onCompleted }) {
     }
   }
 
-  const maps = `https://www.google.com/maps/dir/?api=1&destination=${t.pickup_lat},${t.pickup_lng}`;
+  const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${t.pickup_address}, ${me.city.name}`)}`;
 
   return (
     <div className="stack">

@@ -54,9 +54,9 @@ function completedTrip(email) {
   const user = db.prepare(`INSERT INTO users (email, name, phone) VALUES (?, 'C', '9845012345') RETURNING id`).get(email);
   const car = db.prepare(`INSERT INTO cars (user_id, model, reg_no, transmission) VALUES (?, 'Swift', 'KA01AB1234', 'manual') RETURNING id`).get(user.id);
   return db.prepare(
-    `INSERT INTO bookings (customer_id, car_id, status, pickup_address, pickup_lat, pickup_lng, booked_hours, hourly_rate,
+    `INSERT INTO bookings (customer_id, car_id, status, pickup_address, booked_hours, hourly_rate,
        min_hours, billing_step_min, commission_pct, estimate, otp, amount, commission, driver_earning, billed_minutes, completed_at)
-     VALUES (?, ?, 'completed', 'MG Road', 12.97, 77.6, 2, 20000, 2, 30, 20, 40000, '1234', 40000, 8000, 32000, 120, ?)
+     VALUES (?, ?, 'completed', 'MG Road', 2, 20000, 2, 30, 20, 40000, '1234', 40000, 8000, 32000, 120, ?)
      RETURNING id`,
   ).get(user.id, car.id, new Date().toISOString()).id;
 }
@@ -65,7 +65,7 @@ test('checkout: order, signature check, paid; unpaid trip blocks new bookings', 
   const id = completedTrip('pay@test.in');
   const customer = await login('pay@test.in');
 
-  const blocked = await customer.post('/api/bookings', { car_id: 1, hours: 2, pickup_address: 'MG Road', lat: 12.97, lng: 77.6 });
+  const blocked = await customer.post('/api/bookings', { car_id: 1, hours: 2, pickup_address: 'MG Road' });
   assert.equal(blocked.status, 409);
 
   const order = await customer.post('/api/payments/order', { booking_id: id });

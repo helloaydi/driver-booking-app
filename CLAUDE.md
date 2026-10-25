@@ -14,7 +14,7 @@ One Node app serves the API and a React PWA with three areas: customer (`/`), dr
 - Fare = hourly_rate × actual trip time rounded up to `billing_step_min`, minimum `min_hours`.
 - Booking status: requested → accepted → arrived → started → completed (or cancelled). A driver dropping a trip puts it back to requested.
 - The 4-digit OTP is shown only in the customer app (accepted/arrived) and the driver enters it to start. Never send it to the driver API.
-- Pickup must be within 35 km of central Bangalore. Drivers see requests within `match_radius_km` that match their transmission.
+- No location sharing: pickup is a typed address only, and there is no service-area check. Online drivers see every open request whose car transmission they can drive, oldest first.
 - No cash. The customer pays online right after the trip (Razorpay Checkout) and can't book again until paid.
   `server/payments.js`: order via Razorpay Orders API (plain fetch, no SDK), confirmed by the checkout signature
   (`/api/payments/verify`) and/or the signed webhook (`/api/payments/webhook`, public, checks amount). Both are idempotent.

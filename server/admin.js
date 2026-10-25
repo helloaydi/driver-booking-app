@@ -9,7 +9,6 @@ const SETTING_LIMITS = {
   min_hours: [1, 12],
   billing_step_min: [1, 60],
   commission_pct: [0, 60],
-  match_radius_km: [1, 50],
   request_timeout_min: [2, 60],
 };
 

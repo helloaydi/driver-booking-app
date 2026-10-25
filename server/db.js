@@ -105,6 +105,15 @@ const MIGRATIONS = [
   ALTER TABLE bookings ADD COLUMN paid_at TEXT;
   ALTER TABLE bookings ADD COLUMN payout_at TEXT;
   `,
+  `
+  -- Location sharing was removed: pickups are by address only.
+  ALTER TABLE bookings DROP COLUMN pickup_lat;
+  ALTER TABLE bookings DROP COLUMN pickup_lng;
+  ALTER TABLE drivers DROP COLUMN lat;
+  ALTER TABLE drivers DROP COLUMN lng;
+  ALTER TABLE drivers DROP COLUMN location_at;
+  DELETE FROM settings WHERE key = 'match_radius_km';
+  `,
 ];
 
 export const DEFAULT_SETTINGS = {
@@ -112,7 +121,6 @@ export const DEFAULT_SETTINGS = {
   min_hours: 2,
   billing_step_min: 30, // trip time is rounded up to this many minutes
   commission_pct: 20,
-  match_radius_km: 8,
   request_timeout_min: 10, // unaccepted requests are cancelled after this
 };
 

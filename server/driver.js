@@ -1,21 +1,12 @@
 import express from 'express';
 import { requireDriver } from './auth.js';
-import { getSettings } from './db.js';
-import { distanceKm, finalFare, inServiceArea } from './pricing.js';
+import { finalFare } from './pricing.js';
 import { HttpError, activeBookingFor, expireRequests, now, transition } from './bookings.js';
 
 const MAX_OTP_TRIES = 5;
 
 const canDrive = (driverTransmission, carTransmission) =>
   driverTransmission === 'both' || driverTransmission === carTransmission;
-
-function readLocation(body) {
-  const lat = Number(body?.lat);
-  const lng = Number(body?.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new HttpError(400, 'Share your location');
-  if (!inServiceArea(lat, lng)) throw new HttpError(400, 'You are outside the service area');
-  return { lat, lng };
-}
 
 // What a driver sees about their current trip. Never includes the OTP.
 function driverView(db, booking) {
@@ -57,10 +48,7 @@ export function driverRouter({ db }) {
   router.post('/api/driver/online', (req, res) => {
     const online = Boolean(req.body?.online);
     if (online) {
-      const { lat, lng } = readLocation(req.body);
-      db.prepare('UPDATE drivers SET is_online = 1, lat = ?, lng = ?, location_at = ? WHERE user_id = ?').run(
-        lat, lng, now(), req.user.id,
-      );
+      db.prepare('UPDATE drivers SET is_online = 1 WHERE user_id = ?').run(req.user.id);
     } else {
       if (activeBookingFor(db, 'driver_id', req.user.id)) throw new HttpError(409, 'Finish your current trip first');
       db.prepare('UPDATE drivers SET is_online = 0 WHERE user_id = ?').run(req.user.id);
@@ -68,21 +56,14 @@ export function driverRouter({ db }) {
     res.json({ ok: true });
   });
 
-  router.post('/api/driver/location', (req, res) => {
-    const { lat, lng } = readLocation(req.body);
-    db.prepare('UPDATE drivers SET lat = ?, lng = ?, location_at = ? WHERE user_id = ?').run(lat, lng, now(), req.user.id);
-    res.json({ ok: true });
-  });
-
-  // Open requests near this driver that they are able to drive.
+  // Open requests this driver is able to drive, oldest first.
   router.get('/api/driver/requests', (req, res) => {
     expireRequests(db);
     const me = db.prepare('SELECT * FROM drivers WHERE user_id = ?').get(req.user.id);
-    if (!me.is_online || me.lat == null || activeBookingFor(db, 'driver_id', req.user.id)) return res.json([]);
-    const { match_radius_km } = getSettings(db);
+    if (!me.is_online || activeBookingFor(db, 'driver_id', req.user.id)) return res.json([]);
     const rows = db
       .prepare(
-        `SELECT b.id, b.pickup_address, b.pickup_lat, b.pickup_lng, b.booked_hours, b.estimate,
+        `SELECT b.id, b.pickup_address, b.booked_hours, b.estimate,
            b.commission_pct, b.requested_at, c.model, c.transmission
          FROM bookings b JOIN cars c ON c.id = b.car_id
          WHERE b.status = 'requested' AND b.customer_id != ?
@@ -93,11 +74,8 @@ export function driverRouter({ db }) {
       .filter((r) => canDrive(me.transmission, r.transmission))
       .map(({ commission_pct, ...r }) => ({
         ...r,
-        distance_km: Math.round(distanceKm(me.lat, me.lng, r.pickup_lat, r.pickup_lng) * 10) / 10,
         est_earning: Math.round(r.estimate * (1 - commission_pct / 100)),
-      }))
-      .filter((r) => r.distance_km <= match_radius_km)
-      .sort((a, b) => a.distance_km - b.distance_km);
+      }));
     res.json(requests);
   });
 

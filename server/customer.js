@@ -1,6 +1,6 @@
 import express from 'express';
 import { getSettings } from './db.js';
-import { CITY, estimate, inServiceArea } from './pricing.js';
+import { CITY, estimate } from './pricing.js';
 import { HttpError, activeBookingFor, expireRequests, newOtp, now, transition } from './bookings.js';
 
 const PHONE = /^[6-9]\d{9}$/; // Indian mobile number, 10 digits
@@ -86,7 +86,7 @@ export function customerRouter({ db }) {
   });
 
   router.post('/api/bookings', (req, res) => {
-    const { car_id, pickup_address, lat, lng } = req.body ?? {};
+    const { car_id, pickup_address } = req.body ?? {};
     const hours = validHours(req.body?.hours);
     if (!req.user.phone) throw new HttpError(400, 'Add your phone number first');
     const car = db.prepare('SELECT * FROM cars WHERE id = ? AND user_id = ? AND deleted = 0').get(car_id, req.user.id);
@@ -94,8 +94,6 @@ export function customerRouter({ db }) {
     if (!hours) throw new HttpError(400, 'Choose between 1 and 12 hours');
     const address = String(pickup_address ?? '').trim();
     if (address.length < 5) throw new HttpError(400, 'Enter the pickup address');
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new HttpError(400, 'Share your location to book');
-    if (!inServiceArea(lat, lng)) throw new HttpError(400, `Sorry, we only serve ${CITY.name} for now`);
 
     const id = db.transaction(() => {
       expireRequests(db);
@@ -107,12 +105,12 @@ export function customerRouter({ db }) {
       const s = getSettings(db);
       const { lastInsertRowid } = db
         .prepare(
-          `INSERT INTO bookings (customer_id, car_id, pickup_address, pickup_lat, pickup_lng, booked_hours,
+          `INSERT INTO bookings (customer_id, car_id, pickup_address, booked_hours,
              hourly_rate, min_hours, billing_step_min, commission_pct, estimate, otp, requested_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
-          req.user.id, car.id, address, lat, lng, hours,
+          req.user.id, car.id, address, hours,
           s.hourly_rate, s.min_hours, s.billing_step_min, s.commission_pct, estimate(s, hours), newOtp(), now(),
         );
       return Number(lastInsertRowid);

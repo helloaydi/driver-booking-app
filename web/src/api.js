@@ -57,17 +57,6 @@ export const minutesLabel = (m) => {
 export const timeLabel = (iso) =>
   iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
-export function getLocation() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('This device cannot share location'));
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      (e) => reject(new Error(e.code === 1 ? 'Allow location access to continue' : 'Could not get your location')),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
-    );
-  });
-}
-
 export const STATUS_LABEL = {
   requested: 'Finding a driver',
   accepted: 'Driver on the way',
